@@ -12,6 +12,13 @@ from quantforge.research.experiment import (
     serialize_experiment,
 )
 from quantforge.research.loading import ResearchDataLoader
+from quantforge.research.market_bars import (
+    DataOrigin,
+    MarketBar,
+    MarketBarDataset,
+    MarketBarLoader,
+    synthetic_market_bar,
+)
 from quantforge.research.models import (
     ANNUALIZATION_NOTE,
     AUTOCORRELATION_DEFINITION,
@@ -106,12 +113,16 @@ __all__ = [
     "CoverageError",
     "CoverageGap",
     "CoveragePolicy",
+    "DataOrigin",
     "DatasetSplits",
     "DescriptiveSummary",
     "ExperimentManifest",
     "FeatureSpecification",
     "HoldoutAccessError",
     "LookaheadError",
+    "MarketBar",
+    "MarketBarDataset",
+    "MarketBarLoader",
     "MissingReason",
     "PartitionLineage",
     "PriceObservation",
@@ -154,4 +165,5 @@ __all__ = [
     "split_for_open_time",
     "split_observations",
     "summarize_returns",
+    "synthetic_market_bar",
 ]

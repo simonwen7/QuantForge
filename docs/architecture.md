@@ -68,15 +68,15 @@ Implemented through Milestone 5:
 - Canonical experiment manifests and SHA-256 identifiers bound to source lineage.
 - A fixed long-or-flat 24-hour time-series momentum signal with Decimal
   momentum, causal availability, and per-close source lineage.
+- A latency-one event-driven spot backtest with Decimal cash and BTC
+  accounting, explicit fees and adverse slippage, and a separate run identifier.
 
 Planned, not implemented:
 
 - Live ingestion runs, pending explicit resolution of the dataset licensing
   gate.
 - Real-source compatibility testing and broader economic anomaly analysis.
-- Order generation, fills, transaction costs, and strategy evaluation.
-- Event, execution, accounting, and risk models.
-- Research report generation.
+- Performance statistics, risk analytics, and research report generation.
 
 ## Ingestion boundary
 
@@ -312,6 +312,52 @@ the earliest eligible bar open. They do not contain a quantity, fee, or fill.
 identifiers. Its own configuration hash is separate. Dataset signaling uses the
 M4 loader and refuses development-mode 2025 data and final-evaluation mode.
 The documented hypothesis is not an observed performance result.
+
+## Backtest boundary
+
+M6 replays hourly bars in one thread. At a shared timestamp the order is: bar
+open, due fill, prior-bar completion, signal release, order submission, then
+valuation. Completion of a bar is scheduled from that bar and still occurs when
+the next open is missing. The default delay is one hour after `available_at`.
+Zero-latency fills are not implemented. A missing due bar expires the order; the
+order is not moved to a later open.
+
+The execution open is loaded by `MarketBarLoader` through the same M3
+publication path as research closes. A bar-open event exposes the open only.
+High, low, close, and volume are copied into a completion view at
+`available_at`. `PriceObservation` stays close-only, and M4 experiment
+identifiers are unchanged. Caller-built bars are labeled synthetic and are not
+verified market data.
+
+The default book starts at 10,000 USDT, charges a 10 bps fee, and applies 5 bps
+of adverse slippage. Those rates, and the `0.00000001` cash and BTC quanta, are
+simulation assumptions. They are not a Binance fee schedule or lot size. The
+engine does not model an order book or market depth, does not support leverage,
+borrowing, shorting, or derivatives, and does not use bar volume to predict
+liquidity at the open. A zero-volume bar can still fill. Buy quantity is
+rounded down after reserving the fee. The posted debit is rounded up to the
+cash quantum and the posted sell credit is rounded down. Initial cash must
+already lie on that quantum, and every posted cash movement does too, so the
+cash balance cannot fall between quanta. `rounding_residual` records the
+difference between the exact product and that posted cash amount. It is smaller
+than one quantum and is not itself a cash balance. Uninvested cash after an
+all-in buy remains on the grid and can exceed one quantum, because one BTC
+quantum can cost more than one cash quantum. The recorded fee is the posted
+fee. A sell that cannot pay a positive cash credit is rejected.
+
+`LONG` buys only from a flat book. `FLAT` sells the entire BTC position.
+`NO_SIGNAL` cancels an order that is still pending and does not reverse a fill
+that already occurred at that timestamp. It can leave BTC held through missing
+hours. Fresh equity points use a completed close and are the only observed
+marks. A stale record repeats the last completed close, keeps that close's
+timestamp, and is not an equity point, so the curve is not filled across the
+gap. The run identifier hashes the execution assumptions, the signal sequence,
+and, for synthetic bars, the full OHLCV identity. It does not include wall-clock
+time and does not alter M4 or M5 identifiers. Development mode still rejects
+2025 before storage, and M6 refuses final-holdout evaluation. No performance
+statistic is calculated. A passing backtest is not a market-fill guarantee or
+evidence of profitability. Real Binance licensing and archive compatibility
+remain unresolved.
 
 ## Initial research scope
 

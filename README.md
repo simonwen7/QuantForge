@@ -50,8 +50,24 @@ hypothesis and its negative-result rules are in
 `docs/research/m5-momentum-hypothesis.md`. No empirical performance has been
 calculated.
 
-Backtesting, portfolio accounting, risk analytics, and research reporting are
-planned and are not yet implemented.
+Milestone 6 adds a single-threaded latency-one backtest. A directional signal
+available at time T can first attempt a spot market order at the observed open
+one hour later. The fill uses that open with a synthetic 10 bps fee and 5 bps
+of adverse slippage. Those rates, the 10,000 USDT starting cash, and the
+`0.00000001` cash and BTC quanta are modeling conventions, not a venue schedule
+or lot size. There is no order-book or depth model. Bar volume is not treated
+as liquidity available at the open, so a zero-volume bar can still produce a
+simulated fill. Buys reserve the fee before sizing the BTC quantity. Posted
+cash amounts stay on the cash-quantum grid. `NO_SIGNAL` holds an existing
+position and does not invent a sale, including across missing hours. Missing
+execution bars expire the order. Fresh equity is marked only at observed bar
+completions; a held position during a gap keeps an explicitly stale reference
+to the last completed close. A passing test shows simulation mechanics. It does
+not show profitability, and it does not guarantee an exchange fill. Actual
+Binance archive compatibility and licensing remain unresolved, and the 2025
+holdout is not evaluated.
+
+Risk analytics and research reporting are planned and are not yet implemented.
 
 ## macOS setup
 
