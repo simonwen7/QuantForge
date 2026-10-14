@@ -16,7 +16,8 @@ Milestone 3 adds deterministic candle-quality assessment and verified monthly
 Parquet publication using DuckDB. Milestone 4 adds verified research loading,
 Decimal close-to-close returns, trailing descriptive statistics, a fixed
 chronological train/validation/holdout protocol, and deterministic experiment
-identifiers.
+identifiers. Milestone 5 adds one fixed long-or-flat momentum signal. It does
+not create orders, fills, or performance results.
 
 The ingestion module constructs deterministic URLs and paths, verifies SHA-256
 checksums, validates ZIP and CSV structure, normalizes documented timestamp
@@ -40,8 +41,17 @@ is called. Selecting final-evaluation mode requires an explicit authorization
 flag even when the request does not include the holdout, and that flag is
 recorded in experiment metadata.
 
-Signals, backtesting, portfolio accounting, risk analytics, and research
-reporting are planned and are not yet implemented.
+The momentum baseline uses 24 consecutive hourly close-to-close steps, which
+requires 25 closes. Positive momentum is `LONG`, nonpositive momentum is
+`FLAT`, and incomplete history is `NO_SIGNAL`. `NO_SIGNAL` is not a sell.
+Directional signals become readable one hour after the decision candle opens
+and record an idealized next-bar-open intent. That intent is not a fill. The
+hypothesis and its negative-result rules are in
+`docs/research/m5-momentum-hypothesis.md`. No empirical performance has been
+calculated.
+
+Backtesting, portfolio accounting, risk analytics, and research reporting are
+planned and are not yet implemented.
 
 ## macOS setup
 

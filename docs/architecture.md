@@ -36,7 +36,7 @@ justifies it.
 
 ## Implementation status
 
-Implemented through Milestone 4:
+Implemented through Milestone 5:
 
 - Python 3.12 package foundation using a `src` layout.
 - Reproducible dependency metadata and lock file managed by `uv`.
@@ -66,13 +66,15 @@ Implemented through Milestone 4:
 - Fixed chronological train, validation, and final-holdout splits, including
   warm-up separation, future-label embargo, and development-mode holdout denial.
 - Canonical experiment manifests and SHA-256 identifiers bound to source lineage.
+- A fixed long-or-flat 24-hour time-series momentum signal with Decimal
+  momentum, causal availability, and per-close source lineage.
 
 Planned, not implemented:
 
 - Live ingestion runs, pending explicit resolution of the dataset licensing
   gate.
 - Real-source compatibility testing and broader economic anomaly analysis.
-- Trading-signal interfaces and strategy evaluation.
+- Order generation, fills, transaction costs, and strategy evaluation.
 - Event, execution, accounting, and risk models.
 - Research report generation.
 
@@ -286,6 +288,30 @@ therefore produce identical identifiers. M4 does not estimate strategy
 performance or test hypotheses that assume independent returns. Real Binance
 compatibility and licensing remain unresolved, and no result here is evidence
 of trading profitability.
+
+## Strategy boundary
+
+M5 turns verified closes into causal signals. The baseline momentum is
+
+```text
+momentum_t = P_t / P_(t-24) - 1
+```
+
+calculated once at `Decimal` precision 50 after checking that the 25 closes
+form 24 exact hourly steps. The strategy does not sort or fill inputs. Each
+signal lists every inspected close and its source archive identity, so a change
+in an earlier month remains visible when the decision candle is unchanged.
+Warmup and gap signals record only observations that exist. Warmup takes
+precedence while fewer than 24 preceding observations exist, including when
+that short prefix is discontinuous. A gap applies only to a full trailing
+window.
+
+Directional signals are readable at `available_at` and name `NEXT_BAR_OPEN` as
+the earliest eligible bar open. They do not contain a quantity, fee, or fill.
+`NO_SIGNAL` has no execution intent. M5 does not modify M4 experiment
+identifiers. Its own configuration hash is separate. Dataset signaling uses the
+M4 loader and refuses development-mode 2025 data and final-evaluation mode.
+The documented hypothesis is not an observed performance result.
 
 ## Initial research scope
 
