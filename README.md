@@ -12,15 +12,24 @@ trading.
 Milestone 1 provides the Python 3.12 package foundation and locked development
 environment. Milestone 2 adds a standard-library ingestion module for monthly
 BTCUSDT Spot 1h Binance Vision archives covering 2021 through 2025.
+Milestone 3 adds deterministic candle-quality assessment and verified monthly
+Parquet publication using DuckDB.
 
 The ingestion module constructs deterministic URLs and paths, verifies SHA-256
 checksums, validates ZIP and CSV structure, normalizes documented timestamp
 units to UTC, publishes files atomically, and records provenance. Its tests use
 only generated synthetic data.
 
-Comprehensive market-data quality analysis, Parquet/DuckDB storage, signals,
-backtesting, portfolio accounting, risk analytics, and research reporting are
-planned and are not yet implemented.
+The quality layer detects missing, duplicate, out-of-order, misaligned, and
+financially inconsistent candles without sorting or changing source
+observations. Errors block storage; warnings such as zero volume or zero trades
+are retained in the validation report. The storage layer independently
+rechecks the raw archive and provenance, reparses and revalidates source rows,
+writes a temporary Parquet partition, reads every value back, and only then
+publishes the complete partition.
+
+Signals, backtesting, portfolio accounting, risk analytics, and research
+reporting are planned and are not yet implemented.
 
 ## macOS setup
 
@@ -90,6 +99,65 @@ rather than inventing missing provenance.
 
 The offline test suite generates all CSV and ZIP content in temporary
 directories and uses injected transports; it does not contact Binance.
+
+## Validated analytical storage
+
+Financial values are checked before storage and written as DuckDB
+`DECIMAL(38,18)` values without conversion through binary floating point.
+Inputs declaring more than 18 fractional places are rejected rather than
+having their scale coerced, including zero or trailing-zero values.
+Timestamps are timezone-aware UTC `TIMESTAMPTZ` values and are compared to
+microsecond precision after Parquet readback. Processed months use this
+deterministic layout:
+
+```text
+data/processed/binance-vision/spot/klines/
+  symbol=BTCUSDT/interval=1h/year=2024/month=01/
+    BTCUSDT-1h-2024-01.parquet
+    manifest.json
+    validation.json
+```
+
+The manifest records source and provenance hashes, request identity, validation
+and storage versions, DuckDB version, Parquet hash and size, row coverage, and
+creation time. The validation report preserves every error and warning.
+Reprocessing an unchanged, fully verified source reuses its partition.
+Different source hashes or incompatible processing versions cause an explicit
+conflict; existing output is never silently overwritten.
+
+DuckDB can query a published partition directly:
+
+```sql
+SET TimeZone = 'UTC';
+SELECT
+  count(*),
+  epoch_us(min(open_time)) AS first_open_time_us,
+  epoch_us(max(open_time)) AS last_open_time_us,
+  sum(volume)
+FROM read_parquet(
+  'data/processed/binance-vision/spot/klines/symbol=BTCUSDT/interval=1h/year=2024/month=01/BTCUSDT-1h-2024-01.parquet',
+  hive_partitioning = false
+);
+```
+
+The writer verifies timestamp columns as `TIMESTAMPTZ` and compares their
+integer epoch-microsecond values during readback. This avoids a hidden runtime
+dependency on `pytz`, which DuckDB's Python conversion of returned
+`TIMESTAMPTZ` objects may otherwise require. Very large sums can overflow
+`DECIMAL(38,18)` even when each input fits; DuckDB reports that overflow
+explicitly, so research queries must handle it rather than expect silent
+rounding.
+
+The test suite uses complete synthetic calendar months, including leap years
+and the 2024-to-2025 timestamp-unit boundary. No live-data compatibility has
+been established. Directory publication uses a same-filesystem rename and
+filesystem synchronization where available, but this is not a claim of perfect
+crash durability on every filesystem. The source files are rechecked before
+publication, and the final directory is reopened and verified before success is
+returned. Concurrent cooperating writers rely on the operating system refusing
+to rename over an existing nonempty partition; the supported macOS behavior is
+tested. This does not protect against malicious filesystem modification or
+changes that occur and are reverted between integrity checks.
 
 Binance Vision licensing remains under review. Public redistribution of the
 datasets or derived reports has not been approved. QuantForge is not
