@@ -13,7 +13,10 @@ Milestone 1 provides the Python 3.12 package foundation and locked development
 environment. Milestone 2 adds a standard-library ingestion module for monthly
 BTCUSDT Spot 1h Binance Vision archives covering 2021 through 2025.
 Milestone 3 adds deterministic candle-quality assessment and verified monthly
-Parquet publication using DuckDB.
+Parquet publication using DuckDB. Milestone 4 adds verified research loading,
+Decimal close-to-close returns, trailing descriptive statistics, a fixed
+chronological train/validation/holdout protocol, and deterministic experiment
+identifiers.
 
 The ingestion module constructs deterministic URLs and paths, verifies SHA-256
 checksums, validates ZIP and CSV structure, normalizes documented timestamp
@@ -27,6 +30,15 @@ are retained in the validation report. The storage layer independently
 rechecks the raw archive and provenance, reparses and revalidates source rows,
 writes a temporary Parquet partition, reads every value back, and only then
 publishes the complete partition.
+
+Research calculations load data only through that verified storage boundary.
+They do not accept arbitrary Parquet paths. Close-derived values become
+available at `open_time + 1 hour`; the exchange `close_time` remains the final
+instant inside the candle and is not treated as an observability timestamp.
+Development mode rejects every request containing a 2025 month before storage
+is called. Selecting final-evaluation mode requires an explicit authorization
+flag even when the request does not include the holdout, and that flag is
+recorded in experiment metadata.
 
 Signals, backtesting, portfolio accounting, risk analytics, and research
 reporting are planned and are not yet implemented.
@@ -158,6 +170,79 @@ returned. Concurrent cooperating writers rely on the operating system refusing
 to rename over an existing nonempty partition; the supported macOS behavior is
 tested. This does not protect against malicious filesystem modification or
 changes that occur and are reverted between integrity checks.
+
+## Research protocol
+
+Research data must enter through `ResearchDataLoader`, which calls the M3
+storage workflow for each requested month and then reads Parquet timestamps with
+`epoch_us`. Exact close prices remain `Decimal`. A dataset is complete only
+relative to its explicitly requested months; a one-month request is never
+described as the full 2021-2025 history.
+
+Close-to-close returns use precision-50 `Decimal` arithmetic:
+
+```text
+simple return = P_t / P_(t-1) - 1
+log return = ln(P_t) - ln(P_(t-1))
+```
+
+The first candle has no return. A missing hour is an explicit gap and is never
+bridged by an older price. Nonpositive or nonfinite prices are rejected.
+
+Rolling means stay in `Decimal`. Standard deviation, volatility, autocorrelation,
+and empirical quantiles cross an explicit boundary to binary64. A finite
+`Decimal` that overflows, underflows to zero, or has a successive nonzero gap
+no larger than 1000 local binary64 roundoffs of `1e-15` makes the affected
+estimate undefined. A converted gap that differs by more than a relative
+tolerance of `1e-3` is also undefined. It is not replaced with zero. Pearson autocorrelation uses the two
+lag-aligned samples; zero variance is undefined, and a correlation more than
+`1e-10` outside `[-1, 1]` is undefined. Smaller floating-point excesses are
+clamped into that interval. Quantiles use Hyndman–Fan type-7 interpolation.
+The default standard deviation is the sample estimator with denominator
+`n - 1`. Population deviation must be requested explicitly. Annualized
+volatility multiplies that deviation by the square root of 8760, a conventional
+365-day hourly count rather than the exact number of observations in every
+calendar year. Incomplete windows produce no statistic. A constant series has
+standard deviation zero and undefined autocorrelation.
+
+A rolling statistic at index `i` uses only inputs through index `i` and becomes
+available at the same time as that input. For a return, that time is the
+current candle's `available_at`.
+
+The approved half-open UTC splits are:
+
+```text
+train:      [2021-01-01T00:00:00Z, 2024-01-01T00:00:00Z)
+validation: [2024-01-01T00:00:00Z, 2025-01-01T00:00:00Z)
+holdout:    [2025-01-01T00:00:00Z, 2026-01-01T00:00:00Z)
+```
+
+Membership uses candle `open_time`. Prior candles may warm up a later split, but
+they are excluded from that split's evaluation rows and from its supervised
+labels. A close label is eligible only when the labeled candle is present and
+its `available_at` is strictly before the split's exclusive end. The final
+training candle opens at 2023-12-31 23:00 UTC and its close becomes available
+exactly at 2024-01-01 00:00 UTC, so that close can inform a decision at the
+validation boundary but cannot be a training label. The same rule applies at
+the validation/holdout boundary. For a candle opening at 10:00 UTC,
+close-derived features are unavailable at 10:00, at its internal `close_time`,
+and one microsecond before 11:00; they become available at 11:00 UTC. This is a
+conservative bar-completion convention, not a measurement of exchange
+publication latency.
+
+Development mode rejects any request that includes a 2025 month, or that sets
+the final-evaluation authorization flag, before storage runs. Final-evaluation
+mode requires that flag and records both the mode and the flag in the
+experiment manifest. These checks do not stop a caller from reading a Parquet
+file directly. A coverage gap records the two successive loaded opens that are
+not one hour apart; it does not invent a row for every absent hour. M4 does
+not fit strategies or evaluate holdout performance.
+
+Experiment identifiers are SHA-256 hashes of canonical JSON containing protocol
+version, split boundaries, feature parameters, coverage, source and Parquet
+lineage, statistical conventions, and software versions. Execution time is
+stored separately and does not affect the identifier. No empirical market result
+is included.
 
 Binance Vision licensing remains under review. Public redistribution of the
 datasets or derived reports has not been approved. QuantForge is not

@@ -36,7 +36,7 @@ justifies it.
 
 ## Implementation status
 
-Implemented through Milestone 3:
+Implemented through Milestone 4:
 
 - Python 3.12 package foundation using a `src` layout.
 - Reproducible dependency metadata and lock file managed by `uv`.
@@ -59,13 +59,20 @@ Implemented through Milestone 3:
 - Processed manifests and validation reports with source-checksum lineage,
   deterministic coverage, integrity hashes, and explicit processing versions.
 - Idempotent processed-partition reuse and explicit source or schema conflicts.
+- Verified research loading through the M3 storage boundary, with explicit
+  requested-month coverage and preserved validation warnings.
+- Decimal simple and log returns, trailing complete-window statistics, and
+  explicit candle availability at one hour after `open_time`.
+- Fixed chronological train, validation, and final-holdout splits, including
+  warm-up separation, future-label embargo, and development-mode holdout denial.
+- Canonical experiment manifests and SHA-256 identifiers bound to source lineage.
 
 Planned, not implemented:
 
 - Live ingestion runs, pending explicit resolution of the dataset licensing
   gate.
 - Real-source compatibility testing and broader economic anomaly analysis.
-- Signal interfaces and experiment tracking.
+- Trading-signal interfaces and strategy evaluation.
 - Event, execution, accounting, and risk models.
 - Research report generation.
 
@@ -202,6 +209,83 @@ durability is made for every operating system or filesystem. Persistent source
 mutation at the checked boundaries is detected, but this is not protection
 against malicious filesystem modification or a file changed and restored
 between checks.
+
+## Research boundary
+
+M4 consumes verified M3 partitions. The loader calls the M3 publication
+workflow, which reparses and revalidates each source archive. A caller-supplied
+Parquet path is not an input and is not treated as verified data. The loader
+then reads `epoch_us` timestamps, preserves `Decimal` closes, and rejects
+duplicate, unordered, or unexpected coverage. Strict mode requires the requested
+months to be present and calendar-contiguous. Explicit partial mode must be
+selected in configuration and cannot be reported as complete coverage. A
+coverage gap stores the previous and next loaded open times when they are not
+exactly one hour apart. It detects the discontinuity without synthesizing one
+row per missing hour.
+
+`available_at = open_time + 1 hour` for every one-hour candle. The stored
+`close_time` remains either one millisecond or one microsecond before that
+boundary, depending on the source year. Prices, returns, and any object
+exposing the same availability timestamp are rejected until `available_at`.
+Rolling statistics are index-aligned with their inputs: index `i` uses only
+earlier and current inputs and is available when input `i` is available.
+
+Returns use a local `Decimal` precision of 50:
+
+```text
+simple return = P_t / P_(t-1) - 1
+log return = ln(P_t) - ln(P_(t-1))
+```
+
+The first row has no return. A non-hourly step is an explicit gap and is never
+filled from an older price. Standard deviation, volatility, autocorrelation,
+and Hyndman–Fan type-7 quantiles convert finite `Decimal` values to binary64.
+The conversion rejects non-finite results and underflow to zero. A successive
+nonzero gap is undefined when it is at most 1000 local roundoffs of `1e-15`,
+or when binary64 changes it by more than a relative tolerance of `1e-3`. That
+condition makes a rolling estimate undefined and makes a one-sample summary
+fail.
+Autocorrelation is the Pearson correlation of the lag-aligned samples. Zero
+variance is undefined. Correlations more than `1e-10` outside `[-1, 1]` are
+undefined; smaller excesses are clamped. Sample deviation divides by `n - 1`
+unless population deviation is requested. Volatility scales that deviation by
+`sqrt(8760)`. The factor 8760 is a 365-day convention, not a claim about every
+calendar year. Trailing windows are complete or absent. Constant deviation is
+zero; constant autocorrelation is undefined.
+
+The protocol boundaries are fixed:
+
+```text
+train:      [2021-01-01T00:00:00Z, 2024-01-01T00:00:00Z)
+validation: [2024-01-01T00:00:00Z, 2025-01-01T00:00:00Z)
+holdout:    [2025-01-01T00:00:00Z, 2026-01-01T00:00:00Z)
+```
+
+Split membership uses `open_time`. A close label also requires the labeled
+candle to be present and its `available_at` to precede the exclusive split end.
+Equality with that end is outside the split, so the last candle in each split
+cannot supply a same-split label at horizon zero, and a one-hour label whose
+future close becomes available exactly at the boundary is excluded too. Warm-up
+rows remain outside evaluation and outside the later split's label set. M4 has
+no parameter-fitting operation, so validation and holdout rows are not consumed
+as training labels.
+
+Development access fails before storage when any requested or supplied month is
+in 2025, and also when the final-evaluation flag is set. Final evaluation
+requires that flag. Both the mode and the flag are hashed into experiment
+identity. These controls reduce accidental holdout use through the loader and
+manifest builder. They do not prevent direct filesystem reads of a published
+2025 partition, and they are not a substitute for procedural control of the
+final evaluation.
+
+Experiment identity hashes canonical configuration, actual and expected
+coverage, source checksum lineage, return and statistic conventions, label
+availability, and software versions. `allow_nan` is disabled. The creation
+timestamp is stored separately and excluded from the hash. Identical inputs
+therefore produce identical identifiers. M4 does not estimate strategy
+performance or test hypotheses that assume independent returns. Real Binance
+compatibility and licensing remain unresolved, and no result here is evidence
+of trading profitability.
 
 ## Initial research scope
 
