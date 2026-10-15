@@ -21,7 +21,7 @@ The web origin is still unknown. Do not invent one.
 | Python | 3.12 |
 | Install command | none in `vercel.json`; the Python runtime installs `requirements.txt` |
 | Entrypoint | `api/index.py` exporting `app` |
-| Function duration | `vercel.json` sets `maxDuration` to 30 seconds |
+| Function duration | Dashboard only. See the manual setting below. |
 
 `requirements.txt` is generated from `uv.lock`. It pins FastAPI, Pydantic,
 Starlette, DuckDB 1.5.6, and their transitive packages. A default install of
@@ -29,9 +29,17 @@ this repository from `pyproject.toml` and `uv.lock` resolves only DuckDB,
 because FastAPI is in the `api` dependency group rather than the library's
 runtime dependencies.
 
-The root `vercel.json` does not set `installCommand`. The previous shared
-command ran for both Vercel projects, and the frontend build selected
-`pip install` because that command's working directory is the repository root.
+The root `vercel.json` contains only the schema. It does not set
+`installCommand` or `functions`. A shared `functions` pattern for
+`api/index.py` fails the Next.js project, because that file is not a frontend
+Serverless Function. Vercel discovers the Python entry automatically from
+`api/index.py`. The previous shared install command also ran for both
+projects, and the frontend build selected `pip install` because that command's
+working directory is the repository root.
+
+Set the API duration in the Vercel Dashboard, not in the shared file:
+
+`quantforge-api → Settings → Functions → Default Max Duration: 30 seconds`
 The API project relies on the Python runtime's automatic install from
 `requirements.txt`. `.vercelignore` excludes `pyproject.toml` and `uv.lock`
 from that upload so the library table, which contains only DuckDB, is not the
@@ -68,9 +76,9 @@ until the platform quota stops it. Stronger quota enforcement would need
 infrastructure this repository does not add.
 
 Hobby plans can reject a 30-second function duration. If the project plan
-allows only 10 seconds, lower `maxDuration` in the API project's `vercel.json`.
-A 168-bar synthetic run is a short CPU task, but the plan cap is a hosted
-setting, not something this repository can observe.
+allows only 10 seconds, lower Default Max Duration in the `quantforge-api`
+Dashboard. A 168-bar synthetic run is a short CPU task, but the plan cap is a
+hosted setting, not something this repository can observe.
 
 DuckDB is imported because existing research modules import it at import time.
 The synthetic terminal does not query it. Whether the Vercel Python image can

@@ -46,8 +46,11 @@ def test_requirements_pin_the_api_runtime():
 
 def test_vercel_function_points_at_the_python_entry():
     config = json.loads((ROOT / "vercel.json").read_text(encoding="utf-8"))
+    assert list(config) == ["$schema"]
     assert "installCommand" not in config
-    assert config["functions"]["api/index.py"]["maxDuration"] == 30
+    assert "functions" not in config
+    deployment = (ROOT / "docs" / "web-deployment.md").read_text(encoding="utf-8")
+    assert "Settings → Functions → Default Max Duration: 30 seconds" in deployment
     ignored_lines = _ignore_entries(ROOT / ".vercelignore")
     assert "pyproject.toml" in ignored_lines
     assert "uv.lock" in ignored_lines
