@@ -71,12 +71,21 @@ Implemented through Milestone 5:
 - A latency-one event-driven spot backtest with Decimal cash and BTC
   accounting, explicit fees and adverse slippage, and a separate run identifier.
 
+Implemented through Milestone 9, in addition to the items above:
+
+- Portfolio returns, risk metrics, cash and buy-and-hold benchmarks, and a
+  synthetic research report.
+- Fixed relative mean reversion and a four-fold training walk-forward report.
+- A candidate protocol freeze, scoped access checks, an expected 60-month
+  manifest, and a blocked readiness report. None of these authorizes a
+  real-market study.
+
 Planned, not implemented:
 
 - Live ingestion runs, pending explicit resolution of the dataset licensing
   gate.
-- Real-source compatibility testing and broader economic anomaly analysis.
-- Performance statistics, risk analytics, and research report generation.
+- Real-source compatibility testing against acquired Binance archives.
+- An authorized train, validation, or final-holdout performance study.
 
 ## Ingestion boundary
 
@@ -418,6 +427,35 @@ are separate. Metrics reuse the M7 formulas, including undefined dispersion on
 a gap. Fold and study ids bind the bar contents, source hashes, run ids, and
 configuration. They do not bind the wall clock. No fold result is compounded
 into a single multi-year equity curve.
+
+## Readiness boundary
+
+M9 records a candidate protocol and a readiness report. It does not approve
+the protocol, acquire archives, or calculate a market result. The protocol id
+hashes the research decisions and excludes approval state and wall-clock time.
+Constructing that object leaves the state at pending human approval.
+
+Access scopes are `verified_train`, `verified_validation`, and
+`verified_holdout`. A train record cannot name 2024 or 2025. A validation
+record cannot name 2025. A holdout record must cite the same protocol id.
+Synthetic fixture records are not human authorization. Acceptance stays
+disabled, so a structurally complete external record still cannot open data.
+This is a workflow check. It is not a filesystem lock and it cannot make a
+holdout evaluation one-time.
+
+The expected manifest lists 60 BTCUSDT spot 1h months: 36 train, 12
+validation, and 12 holdout. Those rows mean the calendar expects a file.
+They do not mean the file exists. Preflight reuses the monthly hour count,
+timestamp unit, schema version, and M3 issue severities. Hard failures block
+a future performance table. Warnings stay in the result. A passing fixture is
+labeled synthetic and cannot be stored as `VERIFIED_REAL_SOURCE`.
+
+The last candle of a partition is the open one hour before the exclusive end.
+Its close is valued at that end, from the candle itself, without a bar from
+the next year and without a liquidation. Fills remain inside the half-open
+window, so an order due exactly at the end is rejected. The readiness report
+keeps legal, source, data, quality, protocol, and the three partition gates
+separate. The holdout line is `FINAL_HOLDOUT_NOT_EXECUTED`.
 
 ## Initial research scope
 

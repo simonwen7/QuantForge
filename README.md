@@ -90,6 +90,15 @@ every lookback, threshold, and cost cell, including no-trade and negative
 outcomes, and it does not select a winner. The study is synthetic mechanics
 only. It does not evaluate 2024 validation or the 2025 holdout.
 
+Milestone 9 adds a candidate research-protocol document, scoped authorization
+checks, an expected 60-month archive manifest, and a readiness report. The
+protocol id is not human approval. Train, validation, and holdout grants are
+not interchangeable, and none of them is active. The empirical study function
+rejects data paths and readers. Its report states that train, validation, and
+the final holdout were not executed. A synthetic fixture can pass a preflight
+without becoming verified Binance data. Licensing remains unresolved. The
+procedure is described in `docs/research/m9-readiness.md`.
+
 ## macOS setup
 
 Install `uv` with Homebrew, install Python 3.12, and synchronize the locked
