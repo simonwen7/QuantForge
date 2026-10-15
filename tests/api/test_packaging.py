@@ -19,15 +19,19 @@ def test_requirements_pin_the_api_runtime():
 
 def test_vercel_function_points_at_the_python_entry():
     config = json.loads((ROOT / "vercel.json").read_text(encoding="utf-8"))
-    assert config["installCommand"] == (
-        "if [ -f package.json ] && [ -f package-lock.json ]; then npm ci; "
-        "else pip install -r requirements.txt; fi"
-    )
-    assert "api/index.py" in config["functions"]
-    ignored = (ROOT / ".vercelignore").read_text(encoding="utf-8")
-    assert "pyproject.toml" in ignored
-    assert "uv.lock" in ignored
-    assert "src" not in {line.strip() for line in ignored.splitlines()}
+    assert "installCommand" not in config
+    assert config["functions"]["api/index.py"]["maxDuration"] == 30
+    ignored_lines = {
+        line.strip() for line in (ROOT / ".vercelignore").read_text(encoding="utf-8").splitlines()
+    }
+    assert "pyproject.toml" in ignored_lines
+    assert "uv.lock" in ignored_lines
+    assert "requirements.txt" not in ignored_lines
+    assert "src" not in ignored_lines
+    web = ROOT / "apps" / "web"
+    assert (web / "package.json").is_file()
+    assert (web / "package-lock.json").is_file()
+    assert not (web / "vercel.json").exists()
 
 
 def test_index_module_exports_the_asgi_app():

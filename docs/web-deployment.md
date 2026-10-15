@@ -2,13 +2,15 @@
 
 QuantForge's interactive terminal is two Vercel projects from this one
 repository. The Python API and the Next.js app deploy separately. This
-document describes the expected project settings. It does not record a
-deployment. No public URL exists yet.
+document describes the expected project settings.
 
-Placeholders, not addresses:
+The API project has been deployed and has served `/api/health` plus a
+synthetic backtest:
 
-- API project: not deployed
+- API project: `https://quantforge-api.vercel.app`
 - Web project: not deployed
+
+The web origin is still unknown. Do not invent one.
 
 ## API project
 
@@ -17,7 +19,7 @@ Placeholders, not addresses:
 | Root directory | repository root (`.`) |
 | Framework | Python, detected from `api/index.py` |
 | Python | 3.12 |
-| Install command | `pip install -r requirements.txt` when the project root has no `package.json` |
+| Install command | none in `vercel.json`; the Python runtime installs `requirements.txt` |
 | Entrypoint | `api/index.py` exporting `app` |
 | Function duration | `vercel.json` sets `maxDuration` to 30 seconds |
 
@@ -27,10 +29,15 @@ this repository from `pyproject.toml` and `uv.lock` resolves only DuckDB,
 because FastAPI is in the `api` dependency group rather than the library's
 runtime dependencies.
 
-`.vercelignore` excludes `pyproject.toml` and `uv.lock` from the API project
-upload. That leaves `requirements.txt` as the dependency manifest the Python
-build installs. `.python-version` still says `3.12`. Do not remove those two
-exclusions unless FastAPI is added to the library's runtime dependencies.
+The root `vercel.json` does not set `installCommand`. The previous shared
+command ran for both Vercel projects, and the frontend build selected
+`pip install` because that command's working directory is the repository root.
+The API project relies on the Python runtime's automatic install from
+`requirements.txt`. `.vercelignore` excludes `pyproject.toml` and `uv.lock`
+from that upload so the library table, which contains only DuckDB, is not the
+manifest. `requirements.txt` and `src/` stay included. `.python-version` still
+says `3.12`. Do not remove those two exclusions unless FastAPI is added to the
+library's runtime dependencies.
 
 `api/index.py` inserts `src/` on `sys.path` when that directory is present, so
 the function does not need the developer virtual environment or a preset
@@ -76,12 +83,11 @@ DuckDB from the library to make a guess succeed.
 | Root directory | `apps/web` |
 | Framework | Next.js |
 | Node.js | 22 |
-| Install command | `npm ci`, selected because `apps/web` contains `package.json` and `package-lock.json` |
+| Install command | Dashboard override `npm ci`; there is no `apps/web/vercel.json` |
 | Environment variable | `QUANTFORGE_API_ORIGIN` |
 
-Set `QUANTFORGE_API_ORIGIN` to the API project's origin, with no path and no
-trailing slash. Example shape, not a real host:
-`https://quantforge-api.example.vercel.app`.
+Set `QUANTFORGE_API_ORIGIN` to the API origin, with no path and no trailing
+slash: `https://quantforge-api.vercel.app`.
 
 The variable is not prefixed with `NEXT_PUBLIC_`. The browser does not receive
 it. `app/api/[...path]/route.ts` reads it when a request arrives, then fetches
@@ -130,8 +136,9 @@ Open `http://127.0.0.1:3000`. The first screen requests
 - It does not authenticate to Vercel.
 - It does not create the projects.
 - It does not store a deployment token.
-- It does not publish a public URL.
+- It does not publish the web URL. The API origin above is the one already
+  verified by a human deployment.
 
-After a human deploy, replace the placeholders above with the real origins and
-confirm `GET /api/health` on the API project before pointing the web project
-at it.
+Point the web project at that API origin, then confirm a backtest, replay, and
+comparison through the public web URL. Record that web origin here after it
+deploys.

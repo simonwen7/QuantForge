@@ -1,6 +1,5 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "installCommand": "if [ -f package.json ] && [ -f package-lock.json ]; then npm ci; else pip install -r requirements.txt; fi",
   "functions": {
     "api/index.py": {
       "maxDuration": 30
