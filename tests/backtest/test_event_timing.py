@@ -5,7 +5,12 @@ from decimal import Decimal
 
 import pytest
 
-from quantforge.backtest import BacktestEngine, EventPhase, ExecutionAssumptions
+from quantforge.backtest import (
+    BacktestEngine,
+    EventPhase,
+    ExecutionAssumptions,
+    PriceKind,
+)
 from quantforge.backtest.models import BacktestDataError
 from quantforge.research import synthetic_market_bar
 from quantforge.strategies.models import SignalAction
@@ -64,7 +69,9 @@ def test_phases_at_one_timestamp_follow_the_approved_order():
     assert result.fills[0].raw_open == Decimal(100)
     assert result.fills[0].execution_price == Decimal("100.05")
     marked = next(point for point in result.equity_points if point.time == filled_at)
-    assert marked.price == Decimal(11)
+    assert marked.price == Decimal(100)
+    assert marked.price_kind is PriceKind.OPEN
+    assert marked.price != complete_event.complete_view.close
     assert marked.fresh is True
     assert result.final_btc == Decimal(1)
     assert result.fills[0].time == filled_at
@@ -158,3 +165,103 @@ def test_microsecond_2025_completion_still_waits_one_hour():
     assert bars[0].close_time == bars[0].available_at - timedelta(microseconds=1)
     assert result.fills[0].time == start + 2 * HOUR
     assert result.data_origin.value == "synthetic_unverified"
+
+
+def test_fill_is_marked_at_the_execution_open_not_the_previous_close():
+    bars = bars_at(
+        START,
+        ("100", "100", "100", "200"),
+        ("100", "150", "100", "200"),
+    )
+    result = BacktestEngine().run_synthetic(
+        bars,
+        (directional_signal(START + HOUR, SignalAction.LONG, "0.5"),),
+        assumptions=ExecutionAssumptions(
+            initial_cash=Decimal(200),
+            fee_rate=Decimal(0),
+            slippage_rate=Decimal(0),
+        ),
+    )
+    filled_at = START + 3 * HOUR
+    marked = next(point for point in result.equity_points if point.time == filled_at)
+    later = next(
+        point for point in result.equity_points if point.time == filled_at + HOUR
+    )
+
+    assert result.fills[0].time == filled_at
+    assert result.fills[0].raw_open == Decimal(200)
+    assert result.fills[0].execution_price == Decimal(200)
+    assert result.fills[0].posted_fee == Decimal(0)
+    assert marked.price_kind is PriceKind.OPEN
+    assert marked.price == Decimal(200)
+    assert marked.price != Decimal(100)
+    assert marked.btc == Decimal(1)
+    assert marked.equity == Decimal(200)
+    assert later.price_kind is PriceKind.CLOSE
+    assert later.price == Decimal(200)
+    assert later.equity == Decimal(200)
+    assert all(point.equity == Decimal(200) for point in result.equity_points)
+
+
+def test_fill_mark_does_not_use_the_execution_bar_close():
+    bars = bars_at(
+        START,
+        ("100", "100", "100", "200"),
+        ("100", "150", "100", "999"),
+    )
+    result = BacktestEngine().run_synthetic(
+        bars,
+        (directional_signal(START + HOUR, SignalAction.LONG, "0.5"),),
+        assumptions=ExecutionAssumptions(
+            initial_cash=Decimal(200),
+            fee_rate=Decimal(0),
+            slippage_rate=Decimal(0),
+        ),
+    )
+    filled_at = START + 3 * HOUR
+    marked = next(point for point in result.equity_points if point.time == filled_at)
+    completed = next(
+        point for point in result.equity_points if point.time == filled_at + HOUR
+    )
+
+    assert marked.price == Decimal(200)
+    assert marked.equity == Decimal(200)
+    assert completed.price == Decimal(999)
+    assert completed.price_kind is PriceKind.CLOSE
+    assert completed.time > result.fills[0].time
+
+
+def test_an_open_is_the_mark_when_no_trade_occurs():
+    bars = bars_at(START, ("100", "200"), ("100", "50"))
+    result = BacktestEngine().run_synthetic(bars, ())
+    opened = next(point for point in result.equity_points if point.time == START + HOUR)
+    closed = next(
+        point for point in result.equity_points if point.time == START + 2 * HOUR
+    )
+
+    assert result.fills == ()
+    assert result.final_btc == Decimal(0)
+    assert len({point.time for point in result.equity_points}) == len(
+        result.equity_points
+    )
+    assert opened.price_kind is PriceKind.OPEN
+    assert opened.price == Decimal(200)
+    assert opened.price_open_time == START + HOUR
+    assert opened.equity == Decimal(10000)
+    assert closed.price_kind is PriceKind.CLOSE
+    assert closed.price == Decimal(50)
+    assert closed.price_open_time == START + HOUR
+    assert closed.time > closed.price_open_time
+    assert all(point.price_open_time <= point.time for point in result.equity_points)
+
+
+def test_run_identity_binds_the_valuation_convention(monkeypatch):
+    bars = bars_at(START, ("10", "11"), ("10", "12"))
+    engine = BacktestEngine()
+    original = engine.run_synthetic(bars, ())
+    monkeypatch.setattr(
+        "quantforge.backtest.engine.VALUATION_CONVENTION",
+        "other-convention",
+    )
+
+    assert engine.run_synthetic(bars, ()).run_id != original.run_id

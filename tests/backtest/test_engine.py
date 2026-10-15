@@ -8,7 +8,11 @@ from quantforge.backtest import (
     EvaluationWindow,
     ExecutionAssumptions,
 )
-from quantforge.backtest.models import BacktestConfigurationError, BacktestDataError
+from quantforge.backtest.models import (
+    BacktestConfigurationError,
+    BacktestDataError,
+    PriceKind,
+)
 from quantforge.research import (
     HOLDOUT_START,
     TRAIN_START,
@@ -151,18 +155,19 @@ def test_gap_does_not_invent_prices_and_a_held_position_is_marked_stale():
     result = BacktestEngine().run_synthetic(bars, _signals(bars))
     equity_times = {point.time for point in result.equity_points}
 
+    resumed = next(
+        point for point in result.equity_points if point.time == start + 6 * HOUR
+    )
     assert result.final_btc > 0
     assert start + 5 * HOUR not in equity_times
     assert all(point.fresh for point in result.equity_points)
+    assert resumed.price_kind is PriceKind.OPEN
+    assert resumed.price == Decimal(50)
     assert result.market_gaps == (
         type(result.market_gaps[0])(start + 3 * HOUR, start + 6 * HOUR),
     )
-    assert len(result.stale_valuations) == 1
-    stale = result.stale_valuations[0]
-    assert stale.fresh is False
-    assert stale.last_price_time < stale.time
-    assert stale.last_price_time in equity_times
-    assert stale.time not in equity_times
+    assert result.stale_valuations == ()
+    assert all(mark.time not in equity_times for mark in result.stale_valuations)
     assert result.no_signal_policy == "hold_and_cancel_pending"
 
 

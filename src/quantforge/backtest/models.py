@@ -18,6 +18,7 @@ from quantforge.research.models import ResearchError
 
 ENGINE_VERSION = "m6-backtest-v1"
 NO_SIGNAL_POLICY = "hold_and_cancel_pending"
+VALUATION_CONVENTION = "asof_open_else_completed_close"
 ACCOUNTING_PRECISION = 50
 LATENCY_BARS = 1
 DEFAULT_INITIAL_CASH = Decimal(10000)
@@ -68,6 +69,13 @@ class OrderState(StrEnum):
     REJECTED = "rejected"
     EXPIRED = "expired"
     CANCELED = "canceled"
+
+
+class PriceKind(StrEnum):
+    """Which observable print an equity mark used."""
+
+    OPEN = "open"
+    CLOSE = "close"
 
 
 class RejectionReason(StrEnum):
@@ -262,10 +270,16 @@ class LedgerEntry:
 
 @dataclass(frozen=True)
 class EquityPoint:
-    """A fresh mark at a bar completion. Missing hours are not interpolated."""
+    """A fresh mark at the latest price observable at ``time``.
+
+    When a bar opens at ``time``, the mark uses that open. A completed close is
+    used only when no open is observable at the same timestamp. Missing hours
+    are not interpolated.
+    """
 
     time: datetime
     price: Decimal
+    price_kind: PriceKind
     price_open_time: datetime
     cash: Decimal
     btc: Decimal

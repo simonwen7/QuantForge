@@ -3,8 +3,9 @@
 At timestamp T the phases are: reveal an open if one exists, resolve an order
 due at T from that open only, release the prior bar's completed OHLCV, release
 the M5 signal, submit a new order when the position and policy allow it, then
-mark equity with a price that is already available. Completion is scheduled
-from the completed bar and does not require the next open.
+mark equity. The mark uses the open at T when that open was observed. It uses
+the completed close only when no open is observable at T. Completion is
+scheduled from the completed bar and does not require the next open.
 """
 
 from __future__ import annotations
@@ -31,6 +32,7 @@ from quantforge.backtest.execution import OrderBook
 from quantforge.backtest.models import (
     ENGINE_VERSION,
     NO_SIGNAL_POLICY,
+    VALUATION_CONVENTION,
     BacktestDataError,
     BacktestIntegrityError,
     BacktestResult,
@@ -41,6 +43,7 @@ from quantforge.backtest.models import (
     EventPhase,
     ExecutionAssumptions,
     MarketGap,
+    PriceKind,
     StaleValuation,
     bar_complete_view,
     bar_open_view,
@@ -242,13 +245,28 @@ class BacktestEngine:
                 if outcome.name == "submit" and outcome.order is not None:
                     push(outcome.order.due_time)
 
-            if completed is not None:
-                price = completed.close
-                equity = portfolio.equity(price)
+            mark_price: Decimal | None = None
+            mark_open_time: datetime | None = None
+            mark_kind: PriceKind | None = None
+            if open_view is not None:
+                mark_price = open_view.open
+                mark_open_time = open_view.open_time
+                mark_kind = PriceKind.OPEN
+            elif completed is not None:
+                mark_price = completed.close
+                mark_open_time = completed.open_time
+                mark_kind = PriceKind.CLOSE
+            if (
+                mark_price is not None
+                and mark_open_time is not None
+                and mark_kind is not None
+            ):
+                equity = portfolio.equity(mark_price)
                 point = EquityPoint(
                     time=now,
-                    price=price,
-                    price_open_time=completed.open_time,
+                    price=mark_price,
+                    price_kind=mark_kind,
+                    price_open_time=mark_open_time,
                     cash=portfolio.cash,
                     btc=portfolio.btc,
                     equity=equity,
@@ -266,9 +284,9 @@ class BacktestEngine:
                         name=VALUATION,
                     )
                 )
-                last_price = price
+                last_price = mark_price
                 last_price_time = now
-                last_price_open = completed.open_time
+                last_price_open = mark_open_time
                 stale_emitted = False
             elif (
                 observed_gap
@@ -433,6 +451,7 @@ def _identity_payload(
         "cash_quantum": format_decimal(assumptions.cash_quantum),
         "data_origin": result.data_origin.value,
         "engine_version": ENGINE_VERSION,
+        "valuation_convention": VALUATION_CONVENTION,
         "evaluation_window": None
         if window is None
         else [format_utc(window.start), format_utc(window.end)],

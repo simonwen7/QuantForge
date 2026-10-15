@@ -14,6 +14,7 @@ from quantforge.backtest.models import (
     ENGINE_VERSION,
     LATENCY_BARS,
     NO_SIGNAL_POLICY,
+    VALUATION_CONVENTION,
     BacktestConfigurationError,
     BacktestDataError,
     BacktestError,
@@ -32,6 +33,7 @@ from quantforge.backtest.models import (
     Order,
     OrderSide,
     OrderState,
+    PriceKind,
     RejectionReason,
     StaleValuation,
 )
@@ -45,6 +47,7 @@ __all__ = [
     "ENGINE_VERSION",
     "LATENCY_BARS",
     "NO_SIGNAL_POLICY",
+    "VALUATION_CONVENTION",
     "BacktestConfigurationError",
     "BacktestDataError",
     "BacktestEngine",
@@ -64,6 +67,7 @@ __all__ = [
     "Order",
     "OrderSide",
     "OrderState",
+    "PriceKind",
     "RejectionReason",
     "StaleValuation",
 ]

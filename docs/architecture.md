@@ -348,16 +348,52 @@ fee. A sell that cannot pay a positive cash credit is rejected.
 `LONG` buys only from a flat book. `FLAT` sells the entire BTC position.
 `NO_SIGNAL` cancels an order that is still pending and does not reverse a fill
 that already occurred at that timestamp. It can leave BTC held through missing
-hours. Fresh equity points use a completed close and are the only observed
-marks. A stale record repeats the last completed close, keeps that close's
-timestamp, and is not an equity point, so the curve is not filled across the
-gap. The run identifier hashes the execution assumptions, the signal sequence,
+hours. Fresh equity uses the open at the valuation timestamp when that open was
+observed, because that print is available and matches a fill just booked there.
+The completed close is used only when the timestamp has no open. The mark records
+whether the price was an open or a close. A stale record repeats the last fresh
+price, keeps that price's timestamp, and is not an equity point, so the curve is
+not filled across the gap. The run identifier hashes the execution assumptions,
+the valuation convention, the signal sequence,
 and, for synthetic bars, the full OHLCV identity. It does not include wall-clock
 time and does not alter M4 or M5 identifiers. Development mode still rejects
 2025 before storage, and M6 refuses final-holdout evaluation. No performance
 statistic is calculated. A passing backtest is not a market-fill guarantee or
 evidence of profitability. Real Binance licensing and archive compatibility
 remain unresolved.
+
+## Analytics boundary
+
+M7 reads M6 equity points, fills, and run identifiers. It does not replace the
+ledger. A simple return is `E_t / E_(t-1) - 1` at Decimal precision 50, and only
+when the two fresh in-evaluation marks are exactly one hour apart. Those marks
+follow the as-of rule, so the series is not a close-to-close price series.
+A sample that contains both an open and a completed close says so. The sample
+starts at the pre-trade mark one hour before the shared post-warmup entry, so
+the entry cost is inside the first return. Earlier warm-up marks stay out of
+the metric sample. A mark before a split boundary is not borrowed as a
+validation anchor.
+
+Total return is the endpoint ratio. Maximum drawdown is the most negative
+observed `equity / running peak - 1`. Both remain defined when hours are missing
+and are labeled as observed-point results. Sharpe, Sortino, and annualized
+volatility are undefined on an incomplete hourly grid. They are not computed on
+the longest segment. Sharpe is `mean(r) / sample_std(r) * sqrt(8760)` with a
+zero hourly risk-free rate and sample denominator `n - 1`. Sortino uses the same
+numerator and `sqrt(8760)`, but the denominator is `sqrt(sum(min(r, 0)^2) / n)`
+over every hourly return. A zero denominator is an explicit undefined reason.
+Dispersion estimates reuse the M4 binary64 guard. `8760` is the same 365-day
+convention as M4.
+
+Cash submits no orders. Buy-and-hold buys at the first execution time the fixed
+24-hour rule can be directional, then holds. Its positive momentum field is an
+order-contract placeholder, not a measured signal, and the report does not treat
+it as one. A strategy `FLAT` at that decision does not delay the benchmark. The
+three cost rows are zero, the M6 baseline, and double those rates. All nine
+runs are retained. The report id hashes the policy version, run ids, scenarios,
+evaluation clock, and valuation convention. It does not hash the wall clock.
+`python -m quantforge.analytics` writes the synthetic demonstration. It does not
+read verified storage or 2025 data, and it does not claim profitability.
 
 ## Initial research scope
 

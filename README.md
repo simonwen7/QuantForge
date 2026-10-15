@@ -60,14 +60,24 @@ as liquidity available at the open, so a zero-volume bar can still produce a
 simulated fill. Buys reserve the fee before sizing the BTC quantity. Posted
 cash amounts stay on the cash-quantum grid. `NO_SIGNAL` holds an existing
 position and does not invent a sale, including across missing hours. Missing
-execution bars expire the order. Fresh equity is marked only at observed bar
-completions; a held position during a gap keeps an explicitly stale reference
-to the last completed close. A passing test shows simulation mechanics. It does
-not show profitability, and it does not guarantee an exchange fill. Actual
-Binance archive compatibility and licensing remain unresolved, and the 2025
-holdout is not evaluated.
+execution bars expire the order. At a timestamp when a bar opens, equity is
+marked at that open after any fill. A completed close is the mark only when no
+open is observable then, so a new position is not valued at the previous close.
+A held position during a gap keeps an explicitly stale reference to the last
+fresh price and its original timestamp. A passing test shows simulation
+mechanics. It does not show profitability, and it does not guarantee an
+exchange fill. Actual Binance archive compatibility and licensing remain
+unresolved, and the 2025 holdout is not evaluated.
 
-Risk analytics and research reporting are planned and are not yet implemented.
+Milestone 7 adds synthetic risk analytics. Simple returns exist only for fresh
+equity marks one hour apart. Those marks follow the as-of rule, so the series
+is an equity ratio and not a close-to-close price series. Sharpe, Sortino,
+and annualized volatility are undefined when that hourly grid is incomplete.
+Sortino uses the root-mean-square
+shortfall against a zero hourly target, divided by the full return count.
+Annualization uses the 8760-hour convention. Cash and buy-and-hold are replayed
+by the same engine under zero, baseline, and doubled synthetic costs. The
+report is a synthetic mechanics demonstration, not BTCUSDT performance evidence.
 
 ## macOS setup
 
