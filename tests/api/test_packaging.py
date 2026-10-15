@@ -19,7 +19,10 @@ def test_requirements_pin_the_api_runtime():
 
 def test_vercel_function_points_at_the_python_entry():
     config = json.loads((ROOT / "vercel.json").read_text(encoding="utf-8"))
-    assert config["installCommand"] == "pip install -r requirements.txt"
+    assert config["installCommand"] == (
+        "if [ -f package.json ] && [ -f package-lock.json ]; then npm ci; "
+        "else pip install -r requirements.txt; fi"
+    )
     assert "api/index.py" in config["functions"]
     ignored = (ROOT / ".vercelignore").read_text(encoding="utf-8")
     assert "pyproject.toml" in ignored

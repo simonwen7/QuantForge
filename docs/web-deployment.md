@@ -17,7 +17,7 @@ Placeholders, not addresses:
 | Root directory | repository root (`.`) |
 | Framework | Python, detected from `api/index.py` |
 | Python | 3.12 |
-| Install command | `pip install -r requirements.txt` |
+| Install command | `pip install -r requirements.txt` when the project root has no `package.json` |
 | Entrypoint | `api/index.py` exporting `app` |
 | Function duration | `vercel.json` sets `maxDuration` to 30 seconds |
 
@@ -76,7 +76,7 @@ DuckDB from the library to make a guess succeed.
 | Root directory | `apps/web` |
 | Framework | Next.js |
 | Node.js | 22 |
-| Install command | `npm ci` |
+| Install command | `npm ci`, selected because `apps/web` contains `package.json` and `package-lock.json` |
 | Environment variable | `QUANTFORGE_API_ORIGIN` |
 
 Set `QUANTFORGE_API_ORIGIN` to the API project's origin, with no path and no
