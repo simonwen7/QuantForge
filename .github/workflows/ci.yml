@@ -25,7 +25,7 @@ jobs:
           enable-cache: true
 
       - name: Install locked dependencies
-        run: uv sync --locked --python 3.12 --group dev
+        run: uv sync --locked --python 3.12 --group dev --group api
 
       - name: Check lockfile
         run: uv lock --check
@@ -63,3 +63,33 @@ jobs:
           test "${line1%% *}" = "${line2%% *}"
           cmp "${first}/synthetic-study.json" "${second}/synthetic-study.json"
           cmp "${first}/synthetic-study.md" "${second}/synthetic-study.md"
+
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install locked frontend dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Production build
+        run: npm run build

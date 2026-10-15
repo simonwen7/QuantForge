@@ -481,3 +481,21 @@ until both gates are explicitly resolved.
 No real-data integration has been verified. Public redistribution of Binance
 Vision datasets or derived reports has not been approved. The platform is not
 production-ready.
+
+## Web terminal
+
+The terminal is a separate Next.js process in `apps/web`. It does not import
+the research package into the browser. A same-origin route forwards `/api/*`
+to the FastAPI app in `api/index.py`. That app calls the existing scenario
+generator, strategies, `BacktestEngine.run_synthetic`, and M7 metric functions.
+It does not open a second ledger and it does not call `run_verified`.
+
+Generated bars use a fixed June 2022 clock and the origin
+`synthetic_unverified`. Scenario id, engine `run_id`, and experiment id are
+different hashes. Decimal amounts leave the API as strings. A chart may turn
+those strings into finite coordinates. Those coordinates are not sent back as
+research inputs.
+
+`GET /api/research-block` calls `run_empirical_study` with no filesystem path
+and no reader. The returned states remain unexecuted. The page that shows them
+is a demonstration of the gate, not a study.

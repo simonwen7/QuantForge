@@ -25,6 +25,11 @@ dist/
 .env.local
 .env.*.local
 
+# Web terminal
+node_modules/
+.next/
+apps/web/tsconfig.tsbuildinfo
+
 # Generated local market data
 /data/raw/
 /data/interim/

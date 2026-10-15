@@ -1,0 +1,21 @@
+.venv
+**/.venv
+**/__pycache__
+.pytest_cache
+.ruff_cache
+tests
+artifacts
+dist
+build
+*.egg-info
+apps
+.git
+.github
+docs
+# The API upload must not see the library project table. Vercel installs from
+# pyproject.toml when that file is present, and that table does not include
+# FastAPI. requirements.txt is the function manifest.
+pyproject.toml
+uv.lock
+node_modules
+**/.next

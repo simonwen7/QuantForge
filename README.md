@@ -1,13 +1,59 @@
 # QuantForge — Deterministic Research Simulation Platform
 
 A local research simulator for causal trading signals, event-driven execution,
-and Decimal portfolio accounting.
+and Decimal portfolio accounting, with a synthetic research terminal on top.
 
 QuantForge is a Python library that replays hourly candles in time order,
 turns a fixed rule into a signal only after that candle is complete, simulates
 a spot fill one hour later, and records cash and bitcoin with `Decimal`. The
 same inputs produce the same report id. It is a research and simulation
 project. It does not place live orders.
+
+## Web experience
+
+`apps/web` is a Next.js terminal for the same engine. It has six workspaces:
+Market, Lab, Performance, Replay, Compare, and System. The page loads a
+synthetic momentum run from the Python API and draws that response. It does
+not ship sample prices or sample performance.
+
+Every terminal path is labeled `synthetic_unverified`. The candles are generated
+for June 2022 from a seed. They are not BTCUSDT history. Sharpe, drawdown, and
+fills on screen are properties of that generated path. The M9 protocol stays
+unapproved. Acceptance and activation stay disabled.
+
+The browser calls `/api/*` on the Next.js origin. A server route forwards that
+call to the FastAPI app. Locally the API is `http://127.0.0.1:8000`. A
+production deploy reads `QUANTFORGE_API_ORIGIN` at request time. The build does
+not need that variable, and a production process without it does not call
+localhost.
+
+Deployment is prepared and not performed. There is no public URL yet. The
+two-project runbook is `docs/web-deployment.md`.
+
+```bash
+uv sync --locked --python 3.12 --group dev --group api
+uv run --group api --no-sync uvicorn api.index:app --host 127.0.0.1 --port 8000
+```
+
+```bash
+cd apps/web
+npm ci
+npm run dev
+```
+
+API routes, all under `/api` and also mounted without that prefix:
+
+| Method | Path | Role |
+| --- | --- | --- |
+| GET | `/api/health` | Process check |
+| GET | `/api/config` | Bounds, cost presets, and the synthetic statement |
+| POST | `/api/backtest` | One strategy, cash, and buy-and-hold, with the event trace |
+| POST | `/api/compare` | Both rules at every cost preset, without per-cell traces |
+| GET | `/api/research-block` | The blocked empirical study, with no path and no reader |
+
+Screenshots are not checked in. Capture them from a local or deployed session
+after the API has returned a real run. Do not draw stand-in charts for the
+repository.
 
 ## Overview
 
@@ -63,22 +109,27 @@ The picture and the module boundaries are in `docs/architecture.md`.
 
 ## Tech Stack
 
-Python 3.12, uv, DuckDB, Parquet, pytest, and Ruff. A GitHub Actions workflow
-is configured for Ubuntu and Python 3.12. A hosted run of that workflow has
-not been verified yet.
+Python 3.12, uv, DuckDB, Parquet, pytest, and Ruff. The terminal adds
+Next.js, TypeScript, and FastAPI. A GitHub Actions workflow is configured for
+Ubuntu, Python 3.12, and Node.js 22. A hosted run of the original library job
+was reported after M10. The web job added with the terminal has not been
+observed on GitHub by this change. There is no status badge.
 
-The runtime dependency is DuckDB. pytest and Ruff are development tools.
-Hatchling builds the package and is not imported by the application.
+The library runtime dependency is DuckDB. pytest and Ruff are development
+tools. FastAPI, Pydantic, and Uvicorn are in the `api` dependency group and
+are not installed with the library wheel. Hatchling builds the package and is
+not imported by the application.
 
 ## Quick Start
 
 Install uv, then, from the repository root and with network access:
 
 ```bash
-uv sync --locked --python 3.12 --group dev
+uv sync --locked --python 3.12 --group dev --group api
 ```
 
-That step downloads the locked packages. It is not an empty-cache offline
+That step downloads the locked packages, including the API group used by the
+terminal tests. It is not an empty-cache offline
 install. Later test commands can stay offline.
 
 ## One-Minute Synthetic Demo
@@ -118,9 +169,19 @@ not call Binance.
 
 `.github/workflows/ci.yml` runs those checks on Ubuntu for pulls and for
 pushes to `main`, then installs the built wheel in a separate virtual
-environment and runs the demo outside the checkout. Adding that file does not
-mean the hosted job has passed. There is no status badge until a push has
-produced one.
+environment and runs the demo outside the checkout. A second job installs the
+locked Next.js app, typechecks it, lints it, runs its unit tests, and builds
+it. The frontend build does not need `QUANTFORGE_API_ORIGIN`.
+
+From `apps/web`, the local frontend checks are:
+
+```bash
+npm ci
+npm run typecheck
+npm run lint
+npm test
+npm run build
+```
 
 The latest full local run before this milestone, M9 acceptance, collected 291
 tests and passed them. This milestone's full suite, clean-wheel install, and
@@ -151,8 +212,9 @@ contains no performance figures.
 
 ## Documentation
 
-- `docs/architecture.md` — pipeline, storage, execution, and readiness.
+- `docs/architecture.md` — pipeline, storage, execution, readiness, and the terminal.
 - `docs/development.md` — setup, tests, packaging, and module imports.
+- `docs/web-deployment.md` — two Vercel projects. No public URL is recorded there.
 - `docs/research/m5-momentum-hypothesis.md` — the fixed momentum rule.
 - `docs/research/m8-mean-reversion-walk-forward.md` — the fixed walk-forward.
 - `docs/research/m9-readiness.md` — authorization and the holdout gate.

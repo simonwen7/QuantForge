@@ -107,6 +107,31 @@ not read a 2024 or 2025 market file.
 Writers take a directory argument. Point them at `/tmp` or a pytest `tmp_path`,
 not at `data/raw` or `data/processed`.
 
+## Web terminal
+
+The API dependency group is installed with the dev group:
+
+```bash
+uv sync --locked --python 3.12 --group dev --group api
+uv run --group api --no-sync uvicorn api.index:app --host 127.0.0.1 --port 8000
+```
+
+The Next.js app lives in `apps/web`. `npm ci` then `npm run dev`. Leave
+`QUANTFORGE_API_ORIGIN` unset during `next dev`; the route falls back to
+`http://127.0.0.1:8000`. Production does not use that fallback. See
+`docs/web-deployment.md`.
+
+Frontend checks from `apps/web`:
+
+```bash
+npm run typecheck
+npm run lint
+npm test
+npm run build
+```
+
+`npm run build` must succeed without a production API origin.
+
 ## Troubleshooting
 
 `uv sync --locked` fails offline on a new machine because the lockfile
