@@ -3,15 +3,17 @@
 **/__pycache__
 .pytest_cache
 .ruff_cache
-tests
 artifacts
 dist
 build
 *.egg-info
-apps
 .git
 .github
-docs
+/tests
+/docs
+# Both Vercel projects read this file. Do not exclude apps/: the web project
+# root is apps/web and needs package.json, package-lock.json, and the Next.js
+# source. node_modules and .next stay excluded below.
 # The API upload must not see the library project table. Vercel installs from
 # pyproject.toml when that file is present, and that table does not include
 # FastAPI. requirements.txt is the function manifest.

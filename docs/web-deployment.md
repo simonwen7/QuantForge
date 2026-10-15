@@ -57,8 +57,9 @@ include `/api` in the path it passes to FastAPI. Which of the two the live
 runtime uses is a hosted verification gate. Locally, the `/api` paths are the
 ones the tests call.
 
-`.vercelignore` keeps tests, virtual environments, the Next.js app, docs, and
-build outputs out of the function upload. `src/` and `api/` stay included.
+`.vercelignore` keeps the repository-root tests, virtual environments, docs,
+and build outputs out of the upload. `src/` and `api/` stay included. The
+`apps/` tree also stays included.
 
 There is no database, no background worker, and no market-data download.
 Request bodies are limited to 8 KB by the application. That limit is not a
@@ -85,6 +86,13 @@ DuckDB from the library to make a guess succeed.
 | Node.js | 22 |
 | Install command | Dashboard override `npm ci`; there is no `apps/web/vercel.json` |
 | Environment variable | `QUANTFORGE_API_ORIGIN` |
+
+Both Vercel projects load the repository-root `.vercelignore`. A rule that
+excludes `apps` removes `apps/web/package-lock.json` before the frontend
+install, which is the failure `Frontend lockfile not found`. Do not add that
+rule back. `node_modules` and `**/.next` remain excluded, so dependencies and
+local build output are not uploaded. The API project therefore also receives
+the Next.js source, without its installed packages or `.next` output.
 
 Set `QUANTFORGE_API_ORIGIN` to the API origin, with no path and no trailing
 slash: `https://quantforge-api.vercel.app`.
