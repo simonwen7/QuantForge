@@ -1,42 +1,52 @@
 # QuantForge Architecture
 
-## Intended data flow
+## System pipeline
 
-QuantForge is planned as a small set of modules connected by an explicit
-research pipeline:
+QuantForge is one local Python process. The modules below are library
+boundaries, not services. A close becomes available one hour after its candle
+opens. A directional signal can first attempt a fill one hour after it becomes
+available. Equity uses the bar open when that open is observable, and the
+completed close only when no open exists at that time, including a named
+terminal close at a partition's exclusive end.
 
-```text
-Market Data
-    -> Validation
-    -> Parquet/DuckDB
-    -> Research/Signals
-    -> Event-Driven Backtester
-    -> Risk Analytics
-    -> Research Reports
+```mermaid
+flowchart LR
+  subgraph today [Offline synthetic path]
+    fixture[Synthetic hourly bars]
+    signals[Causal strategies]
+    replay[Latency-one replay]
+    ledger[Decimal ledger]
+    demo[Synthetic risk report]
+    fixture --> signals --> replay --> ledger --> demo
+  end
+
+  subgraph blocked [Verified-data path, not authorized]
+    source[Archive acquisition interface]
+    checksum[SHA-256 and provenance]
+    quality[Candle validation]
+    store[DuckDB and Parquet]
+    gate[M9 readiness and scope checks]
+    study[Train, validation, or holdout study]
+    source --> checksum --> quality --> store --> gate --> study
+  end
 ```
 
-- **Market Data:** Acquire versioned source data without altering the original
-  records.
-- **Validation:** Check schemas, timestamps, ordering, duplicates, gaps, and
-  market-specific invariants before data is accepted.
-- **Parquet/DuckDB:** Store validated data reproducibly and expose it for local
-  analysis.
-- **Research/Signals:** Develop deterministic features and signals while
-  preventing look-ahead bias and data leakage.
-- **Event-Driven Backtester:** Simulate orders, fills, fees, slippage, cash,
-  and positions using information available at each event.
-- **Risk Analytics:** Calculate portfolio and strategy risk from verified
-  accounting outputs.
-- **Research Reports:** Record assumptions, experiment configuration,
-  out-of-sample results, negative findings, and limitations.
+The synthetic path runs today and does not read Binance archives. The
+verified-data path has acquisition, checksum, validation, and storage code,
+plus an M9 gate that denies train, validation, and holdout access. That gate
+is a workflow control. It is not a filesystem lock. The study step is not
+active: legal review, real-source verification, protocol approval, and a human
+authorization record are all unresolved. The diagram does not mean a Binance
+file has been downloaded or checked.
 
-These are intended module boundaries, not separate services. Additional
-infrastructure should be introduced only when a demonstrated requirement
-justifies it.
+Half-open UTC partitions, by candle open time, are train
+`[2021-01-01, 2024-01-01)`, validation `[2024-01-01, 2025-01-01)`, and holdout
+`[2025-01-01, 2026-01-01)`. A readiness report records whether those
+prerequisites are met. It is not an empirical performance report.
 
 ## Implementation status
 
-Implemented through Milestone 5:
+Implemented through Milestone 9:
 
 - Python 3.12 package foundation using a `src` layout.
 - Reproducible dependency metadata and lock file managed by `uv`.
@@ -70,9 +80,6 @@ Implemented through Milestone 5:
   momentum, causal availability, and per-close source lineage.
 - A latency-one event-driven spot backtest with Decimal cash and BTC
   accounting, explicit fees and adverse slippage, and a separate run identifier.
-
-Implemented through Milestone 9, in addition to the items above:
-
 - Portfolio returns, risk metrics, cash and buy-and-hold benchmarks, and a
   synthetic research report.
 - Fixed relative mean reversion and a four-fold training walk-forward report.
@@ -460,10 +467,10 @@ separate. The holdout line is `FINAL_HOLDOUT_NOT_EXECUTED`.
 ## Initial research scope
 
 The initial planned market is BTCUSDT Spot at 1-hour OHLCV resolution. This
-scope does not imply that data has been approved, acquired, or validated.
-Timestamp semantics, trading-calendar expectations, missing intervals,
-duplicates, price and volume constraints, and source-file integrity must be
-defined and tested before research begins.
+scope does not imply that data has been approved or acquired. Timestamp
+semantics, calendar coverage, missing intervals, duplicates, price and volume
+constraints, and source-file integrity are implemented and tested on synthetic
+archives. Compatibility with a real Binance file remains unverified.
 
 Binance Vision is a tentative source only. Its licensing terms and suitability
 for this project remain unresolved gates. Dataset provenance, completeness,

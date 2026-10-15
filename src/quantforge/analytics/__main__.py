@@ -1,7 +1,8 @@
 """Write the offline synthetic demonstration report.
 
-Run ``python -m quantforge.analytics`` from an environment that already has the
-project installed. The command does not download market data.
+``python -m quantforge.analytics`` writes ``artifacts/m7-synthetic/``.
+``python -m quantforge.analytics <directory>`` writes into that directory.
+Neither form downloads market data.
 """
 
 from __future__ import annotations

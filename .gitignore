@@ -14,6 +14,9 @@ build/
 dist/
 *.egg-info/
 
+# Local synthetic reports
+/artifacts/
+
 # macOS
 .DS_Store
 

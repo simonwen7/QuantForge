@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+          enable-cache: true
+
+      - name: Install locked dependencies
+        run: uv sync --locked --python 3.12 --group dev
+
+      - name: Check lockfile
+        run: uv lock --check
+
+      - name: Lint
+        run: UV_OFFLINE=1 uv run --no-sync ruff check .
+
+      - name: Format
+        run: UV_OFFLINE=1 uv run --no-sync ruff format --check .
+
+      - name: Test
+        run: UV_OFFLINE=1 uv run --no-sync pytest
+
+      - name: Build distributions
+        run: uv build
+
+      - name: Install the wheel outside the source tree and run the demo
+        run: |
+          set -euo pipefail
+          mapfile -t wheels < <(printf '%s\n' dist/*.whl)
+          test "${#wheels[@]}" -eq 1
+          uv venv --python 3.12 /tmp/quantforge-smoke
+          uv pip install --python /tmp/quantforge-smoke/bin/python "${wheels[0]}"
+          cd "${RUNNER_TEMP}"
+          unset PYTHONPATH
+          /tmp/quantforge-smoke/bin/python -c 'import quantforge.analytics as analytics; path = analytics.__file__.replace("\\", "/"); assert "site-packages" in path, path'
+          first="${RUNNER_TEMP}/quantforge-demo"
+          second="${RUNNER_TEMP}/quantforge-demo-repeat"
+          line1="$(/tmp/quantforge-smoke/bin/python -m quantforge.analytics "${first}")"
+          line2="$(/tmp/quantforge-smoke/bin/python -m quantforge.analytics "${second}")"
+          test -s "${first}/synthetic-study.json"
+          test -s "${first}/synthetic-study.md"
+          test -s "${second}/synthetic-study.json"
+          test -s "${second}/synthetic-study.md"
+          test "${line1%% *}" = "${line2%% *}"
+          cmp "${first}/synthetic-study.json" "${second}/synthetic-study.json"
+          cmp "${first}/synthetic-study.md" "${second}/synthetic-study.md"

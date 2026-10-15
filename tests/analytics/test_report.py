@@ -1,5 +1,9 @@
 """Deterministic synthetic report identity and holdout rejection."""
 
+import json
+import os
+import subprocess
+import sys
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
@@ -103,3 +107,68 @@ def test_verified_and_2025_bars_are_rejected_and_the_network_is_unused(monkeypat
     run_synthetic_study(bars, config=MomentumConfig(lookback_hours=1))
     with pytest.raises(AnalyticsError, match="directional"):
         run_synthetic_study(bars)
+
+
+def test_cli_keeps_the_default_directory_and_isolates_an_explicit_one(
+    tmp_path, monkeypatch
+):
+    def explode(*args, **kwargs):
+        raise AssertionError("network access")
+
+    monkeypatch.setattr("urllib.request.urlopen", explode)
+    monkeypatch.chdir(tmp_path)
+    from quantforge.analytics.__main__ import main
+
+    explicit = tmp_path / "chosen"
+    main(["quantforge.analytics", os.fspath(explicit)])
+    assert not (tmp_path / "artifacts").exists()
+    first_json = (explicit / "synthetic-study.json").read_bytes()
+    first_markdown = (explicit / "synthetic-study.md").read_bytes()
+    assert first_json and first_markdown
+    payload = json.loads(first_json)
+    assert payload["statement"].startswith("SYNTHETIC MECHANICS DEMONSTRATION")
+    assert "not actual BTCUSDT performance evidence" in payload["statement"]
+    assert "profitab" not in payload["statement"].lower()
+
+    main(["quantforge.analytics", os.fspath(explicit)])
+    assert (explicit / "synthetic-study.json").read_bytes() == first_json
+    assert (explicit / "synthetic-study.md").read_bytes() == first_markdown
+
+    main(["quantforge.analytics"])
+    default_dir = tmp_path / "artifacts" / "m7-synthetic"
+    assert (default_dir / "synthetic-study.json").read_bytes() == first_json
+    assert (default_dir / "synthetic-study.md").read_bytes() == first_markdown
+    assert json.loads(first_json)["report_id"] == payload["report_id"]
+
+
+def test_module_entrypoint_writes_only_the_requested_directory(tmp_path):
+    destination = tmp_path / "outside"
+    env = os.environ.copy()
+    env.pop("PYTHONPATH", None)
+    completed = subprocess.run(
+        [sys.executable, "-m", "quantforge.analytics", os.fspath(destination)],
+        cwd=tmp_path,
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert completed.returncode == 0, completed.stderr
+    first_json = (destination / "synthetic-study.json").read_bytes()
+    first_markdown = (destination / "synthetic-study.md").read_bytes()
+    payload = json.loads(first_json)
+    assert completed.stdout.split()[0] == payload["report_id"]
+    assert first_markdown
+    assert not (tmp_path / "artifacts").exists()
+    repeat = subprocess.run(
+        [sys.executable, "-m", "quantforge.analytics", os.fspath(destination)],
+        cwd=tmp_path,
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert repeat.returncode == 0, repeat.stderr
+    assert repeat.stdout.split()[0] == payload["report_id"]
+    assert (destination / "synthetic-study.json").read_bytes() == first_json
+    assert (destination / "synthetic-study.md").read_bytes() == first_markdown
