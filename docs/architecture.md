@@ -395,6 +395,30 @@ evaluation clock, and valuation convention. It does not hash the wall clock.
 `python -m quantforge.analytics` writes the synthetic demonstration. It does not
 read verified storage or 2025 data, and it does not claim profitability.
 
+## Walk-forward boundary
+
+M8 adds a second signal type, `MeanReversionSignal`, and does not put a
+placeholder into the momentum field. Replay accepts that type or the original
+`StrategySignal` and rejects anything else. Momentum identity documents still
+use the `momentum` key. Mean-reversion documents use `deviation`. Order timing,
+fees, and the ledger are unchanged.
+
+The production calendar is four expanding folds inside training, from 2022-01-01
+through 2024-01-01, half-open. An injected calendar must carry a distinct id
+and cannot be described as that semiannual study. Each fold is a new 10,000
+USDT book. Context before the fold is used only to form the trailing mean.
+Decisions that opened before the fold do not submit orders. The first in-fold
+decision is available one hour later and can fill one hour after that. The
+equity anchor is the mark between those two times. An order due exactly at the
+fold end is rejected. The next fold does not inherit the position.
+
+The report is a fixed-rule chronological evaluation. It is not a fitted
+walk-forward selector. Baseline outcomes and the 3 by 3 by 3 sensitivity grid
+are separate. Metrics reuse the M7 formulas, including undefined dispersion on
+a gap. Fold and study ids bind the bar contents, source hashes, run ids, and
+configuration. They do not bind the wall clock. No fold result is compounded
+into a single multi-year equity curve.
+
 ## Initial research scope
 
 The initial planned market is BTCUSDT Spot at 1-hour OHLCV resolution. This

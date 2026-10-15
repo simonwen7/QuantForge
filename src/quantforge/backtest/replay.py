@@ -7,7 +7,10 @@ from datetime import UTC
 
 from quantforge.backtest.models import BacktestDataError
 from quantforge.research.market_bars import MarketBar
+from quantforge.strategies.mean_reversion import MeanReversionSignal
 from quantforge.strategies.models import StrategySignal
+
+ReplaySignal = StrategySignal | MeanReversionSignal
 
 
 def prepare_bars(bars: Sequence[MarketBar]) -> tuple[MarketBar, ...]:
@@ -29,16 +32,18 @@ def prepare_bars(bars: Sequence[MarketBar]) -> tuple[MarketBar, ...]:
 
 
 def prepare_signals(
-    signals: Sequence[StrategySignal],
+    signals: Sequence[ReplaySignal],
     bars: tuple[MarketBar, ...],
-) -> dict[object, StrategySignal]:
+) -> dict[object, ReplaySignal]:
     """Index signals by availability time and require a matching decision bar."""
     opens = {bar.open_time: bar for bar in bars}
-    indexed: dict[object, StrategySignal] = {}
+    indexed: dict[object, ReplaySignal] = {}
     previous = None
     for signal in signals:
-        if not isinstance(signal, StrategySignal):
-            raise BacktestDataError("replay signals must be StrategySignal values")
+        if not isinstance(signal, (StrategySignal, MeanReversionSignal)):
+            raise BacktestDataError(
+                "replay signals must be StrategySignal or MeanReversionSignal values"
+            )
         if signal.available_at in indexed:
             raise BacktestDataError("duplicate signal availability timestamps")
         if previous is not None and signal.available_at <= previous:

@@ -79,6 +79,17 @@ Annualization uses the 8760-hour convention. Cash and buy-and-hold are replayed
 by the same engine under zero, baseline, and doubled synthetic costs. The
 report is a synthetic mechanics demonstration, not BTCUSDT performance evidence.
 
+Milestone 8 adds a fixed relative mean-reversion rule and a chronological
+walk-forward evaluation inside the 2021–2023 training partition. The signal is
+the current close divided by the mean of the previous 24 closes, minus one.
+It goes long only when that deviation is strictly below -2%. The 24-hour
+lookback and the 2% threshold are pre-specified conventions, not fitted
+values. Four non-overlapping folds each start from their own cash balance.
+Their equity curves are not stitched. A separate sensitivity grid reports
+every lookback, threshold, and cost cell, including no-trade and negative
+outcomes, and it does not select a winner. The study is synthetic mechanics
+only. It does not evaluate 2024 validation or the 2025 holdout.
+
 ## macOS setup
 
 Install `uv` with Homebrew, install Python 3.12, and synchronize the locked

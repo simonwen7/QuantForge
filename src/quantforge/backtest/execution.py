@@ -11,6 +11,7 @@ from datetime import datetime
 from decimal import Decimal
 
 from quantforge.backtest.models import (
+    BacktestDataError,
     BacktestIntegrityError,
     BarOpen,
     EvaluationWindow,
@@ -30,6 +31,7 @@ from quantforge.backtest.portfolio import (
     plan_all_in_buy,
     quote_sell,
 )
+from quantforge.strategies.mean_reversion import MeanReversionSignal
 from quantforge.strategies.models import NEXT_BAR_OPEN, SignalAction, StrategySignal
 
 
@@ -59,11 +61,17 @@ class OrderBook:
 
     def handle_signal(
         self,
-        signal: StrategySignal,
+        signal: StrategySignal | MeanReversionSignal,
         portfolio: Portfolio,
         now: datetime,
     ) -> ExecutionOutcome:
-        """Submit, reject, cancel, or ignore a signal that is already available."""
+        """Submit, reject, cancel, or ignore a signal that is already available.
+
+        The type gate is the only M8 change in this method. Order timing,
+        fees, slippage, and the hold/cancel rules are unchanged.
+        """
+        if not isinstance(signal, (StrategySignal, MeanReversionSignal)):
+            raise BacktestDataError("unsupported signal type")
         if signal.action is SignalAction.NO_SIGNAL:
             canceled = self.cancel_pending(now)
             if canceled is None:
@@ -310,7 +318,7 @@ class OrderBook:
 
     def _reject(
         self,
-        signal: StrategySignal,
+        signal: StrategySignal | MeanReversionSignal,
         side: OrderSide,
         now: datetime,
         reason: RejectionReason,

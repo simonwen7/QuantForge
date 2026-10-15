@@ -1,8 +1,8 @@
 """Cash and buy-and-hold paths executed by the M6 engine.
 
-Buy-and-hold enters at the first fill time the fixed momentum rule can be
-directional. Its ``LONG`` momentum value is an adapter required by the signal
-contract. It is not a measured momentum observation and is not a report field.
+Buy-and-hold enters at the first fill time the supplied rule can be
+directional. Its ``LONG`` momentum value is an adapter required by the momentum
+signal contract. It is not a measured feature and is not a report field.
 """
 
 from __future__ import annotations
@@ -18,6 +18,7 @@ from quantforge.analytics.models import (
 )
 from quantforge.backtest.models import due_time_for
 from quantforge.research.market_bars import MarketBar
+from quantforge.strategies.mean_reversion import MeanReversionSignal
 from quantforge.strategies.models import (
     NEXT_BAR_OPEN,
     LookbackSource,
@@ -26,18 +27,22 @@ from quantforge.strategies.models import (
     StrategySignal,
 )
 
+DirectionalSignal = StrategySignal | MeanReversionSignal
+
 _HOUR = timedelta(hours=1)
 
 
-def first_directional(signals: Sequence[StrategySignal]) -> StrategySignal:
-    """Return the earliest LONG or FLAT decision in an M5 signal stream."""
+def first_directional(signals: Sequence[DirectionalSignal]) -> DirectionalSignal:
+    """Return the earliest LONG or FLAT decision in one validated signal stream."""
     for signal in signals:
+        if not isinstance(signal, (StrategySignal, MeanReversionSignal)):
+            raise AnalyticsError("unsupported signal type")
         if signal.action is not SignalAction.NO_SIGNAL:
             return signal
     raise AnalyticsError("the fixed warm-up produced no directional decision")
 
 
-def entry_fill_time(signals: Sequence[StrategySignal]) -> datetime:
+def entry_fill_time(signals: Sequence[DirectionalSignal]) -> datetime:
     """Return the latency-one open of the first directional decision."""
     return due_time_for(first_directional(signals).available_at)
 
@@ -51,7 +56,7 @@ def cash_signals(bars: Sequence[MarketBar]) -> tuple[StrategySignal, ...]:
 
 def buy_and_hold_signals(
     bars: Sequence[MarketBar],
-    strategy_signals: Sequence[StrategySignal],
+    strategy_signals: Sequence[DirectionalSignal],
 ) -> tuple[StrategySignal, ...]:
     """Buy once at the post-warmup open, then hold through later ``LONG`` no-ops.
 

@@ -1,5 +1,16 @@
 """Causal research signals. M5 does not create orders or fills."""
 
+from quantforge.strategies.mean_reversion import (
+    BASELINE_ENTRY_THRESHOLD,
+    MEAN_REVERSION_DEFINITION,
+    MEAN_REVERSION_FORMULA,
+    MeanReversionConfig,
+    MeanReversionSignal,
+    MeanReversionStrategy,
+    baseline_mean_reversion,
+    mean_reversion_config_id,
+    mean_reversion_config_payload,
+)
 from quantforge.strategies.models import (
     BASELINE_LOOKBACK_HOURS,
     MOMENTUM_FORMULA,
@@ -23,11 +34,17 @@ from quantforge.strategies.momentum import (
 )
 
 __all__ = [
+    "BASELINE_ENTRY_THRESHOLD",
     "BASELINE_LOOKBACK_HOURS",
+    "MEAN_REVERSION_DEFINITION",
+    "MEAN_REVERSION_FORMULA",
     "MOMENTUM_FORMULA",
     "NEXT_BAR_OPEN",
     "STRATEGY_DEFINITION",
     "LookbackSource",
+    "MeanReversionConfig",
+    "MeanReversionSignal",
+    "MeanReversionStrategy",
     "MomentumConfig",
     "MomentumStrategy",
     "NoSignalReason",
@@ -36,7 +53,10 @@ __all__ = [
     "StrategyError",
     "StrategyInputError",
     "StrategySignal",
+    "baseline_mean_reversion",
     "baseline_strategy",
+    "mean_reversion_config_id",
+    "mean_reversion_config_payload",
     "serialize_lookback_lineage",
     "strategy_config_id",
     "strategy_config_payload",

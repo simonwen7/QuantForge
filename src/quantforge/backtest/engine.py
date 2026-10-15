@@ -2,7 +2,7 @@
 
 At timestamp T the phases are: reveal an open if one exists, resolve an order
 due at T from that open only, release the prior bar's completed OHLCV, release
-the M5 signal, submit a new order when the position and policy allow it, then
+the research signal, submit a new order when the position and policy allow it, then
 mark equity. The mark uses the open at T when that open was observed. It uses
 the completed close only when no open is observable at T. Completion is
 scheduled from the completed bar and does not require the next open.
@@ -52,13 +52,14 @@ from quantforge.backtest.models import (
     run_identity,
 )
 from quantforge.backtest.portfolio import Portfolio, accounting_context
-from quantforge.backtest.replay import prepare_bars, prepare_signals
+from quantforge.backtest.replay import ReplaySignal, prepare_bars, prepare_signals
 from quantforge.research.market_bars import DataOrigin, MarketBar, MarketBarDataset
 from quantforge.research.models import (
     HoldoutAccessError,
     PartitionLineage,
     ResearchAccessMode,
 )
+from quantforge.strategies.mean_reversion import MeanReversionSignal
 from quantforge.strategies.models import StrategySignal
 
 _HOUR = timedelta(hours=1)
@@ -84,7 +85,7 @@ class BacktestEngine:
     def run_synthetic(
         self,
         bars: Sequence[MarketBar],
-        signals: Sequence[StrategySignal],
+        signals: Sequence[ReplaySignal],
         assumptions: ExecutionAssumptions | None = None,
         window: EvaluationWindow | None = None,
     ) -> BacktestResult:
@@ -105,7 +106,7 @@ class BacktestEngine:
     def run_verified(
         self,
         dataset: MarketBarDataset,
-        signals: Sequence[StrategySignal],
+        signals: Sequence[ReplaySignal],
         assumptions: ExecutionAssumptions | None = None,
         window: EvaluationWindow | None = None,
     ) -> BacktestResult:
@@ -127,7 +128,7 @@ class BacktestEngine:
     def _run(
         self,
         bars: Sequence[MarketBar],
-        signals: Sequence[StrategySignal],
+        signals: Sequence[ReplaySignal],
         assumptions: ExecutionAssumptions,
         window: EvaluationWindow | None,
         *,
@@ -388,7 +389,7 @@ class BacktestEngine:
             )
 
 
-def _one_strategy_id(signals: Sequence[StrategySignal]) -> str:
+def _one_strategy_id(signals: Sequence[ReplaySignal]) -> str:
     if not signals:
         return "no-strategy"
     identifier = signals[0].strategy_config_id
@@ -413,18 +414,30 @@ def _synthetic_bar_identity(bar: MarketBar) -> dict[str, object]:
     }
 
 
-def _signal_identity(signal: StrategySignal) -> dict[str, object]:
+def _signal_identity(signal: ReplaySignal) -> dict[str, object]:
+    if isinstance(signal, StrategySignal):
+        feature: dict[str, object] = {
+            "momentum": None
+            if signal.momentum is None
+            else format_decimal(signal.momentum),
+        }
+    elif isinstance(signal, MeanReversionSignal):
+        feature = {
+            "deviation": None
+            if signal.deviation is None
+            else format_decimal(signal.deviation),
+        }
+    else:
+        raise BacktestDataError("unsupported signal type")
     return {
         "action": signal.action.value,
         "available_at": format_utc(signal.available_at),
-        "momentum": None
-        if signal.momentum is None
-        else format_decimal(signal.momentum),
         "no_signal_reason": None
         if signal.no_signal_reason is None
         else signal.no_signal_reason.value,
         "open_time": format_utc(signal.open_time),
         "strategy_config_id": signal.strategy_config_id,
+        **feature,
     }
 
 
